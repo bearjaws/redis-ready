@@ -25,17 +25,18 @@ function RedisReady(options) {
     }
     this._maxSpace = options.size;
     this._spaceRemaining = options.size;
+    this._hashingAlgo = crypto.getHashes().indexOf('sha1') !== -1 ? 'sha1' : 'sha256';
 }
 
 /**
  * @summary - Returns the total size of an element
  *
  * @description - This lazily assumes that all objects have non-null
- * keys, this is mostly for cleaner code and partially because it prevents
- * having to perform multiple size checks when linking and unlinking elements.
+ * keys. This is mostly done to create cleaner code,it additionally prevents v8 from having
+ * to do multiple allocs / deallocs for a given change.
  */
 RedisReady.prototype.computeSize = function(element) {
-    return element.blob.length + 88;
+    return element.blob.length + ((this._hashingAlgo === 'sha1' ? 28 : 44) * 2) ;
 }
 
 RedisReady.prototype.debugCache = function(key) {
@@ -51,7 +52,7 @@ RedisReady.prototype.debugCache = function(key) {
             _last: this._last
         }
     } else {
-        var key = crypto.createHash('sha256').update(key).digest('base64');
+        var key = crypto.createHash(this._hashingAlgo).update(key).digest('base64');
         return {
             key: key,
             value: this._cache[key]
@@ -86,7 +87,7 @@ RedisReady.prototype.ensureSpace = function(key, size) {
 }
 
 RedisReady.prototype.get = function(key) {
-    var key = crypto.createHash('sha256').update(key).digest('base64');
+    var key = crypto.createHash(this._hashingAlgo).update(key).digest('base64');
     if (!this._cache.hasOwnProperty(key)) {
         return;
     }
@@ -128,7 +129,7 @@ RedisReady.prototype.getLastElementKey = function() {
 }
 
 RedisReady.prototype.set = function(key, value) {
-    var key = crypto.createHash('sha256').update(key).digest('base64');
+    var key = crypto.createHash(this._hashingAlgo).update(key).digest('base64');
     var element = {
         blob: msgpack.encode(value),
         next: null,
