@@ -27,18 +27,39 @@ function RedisReady(options) {
     this._spaceRemaining = options.size;
 }
 
-RedisReady.prototype.debugCache = function() {
-    if (process.env.NODE_ENV !== "production") {
+/**
+ * @summary - Returns the total size of an element
+ *
+ * @description - This lazily assumes that all objects have non-null
+ * keys, this is mostly for cleaner code and partially because it prevents
+ * having to perform multiple size checks when linking and unlinking elements.
+ */
+RedisReady.prototype.computeSize = function(element) {
+    return element.blob.length + 88;
+}
+
+RedisReady.prototype.debugCache = function(key) {
+    if (process.env.NODE_ENV !== "development") {
+        console.trace("Attempted to run debug cache on non-development environment.");
+        return false;
+    } else if (key === undefined) {
         console.log(JSON.stringify(this._cache, null, 4));
-        console.log(this._spaceRemaining);
-    }
-    else {
-        console.stack("Attempted to run debug cache on production environment.");
+        console.log("Space Remaining: " + this._spaceRemaining);
+        return {
+            remaining: this._spaceRemaining,
+            _first: this._first,
+            _last: this._last
+        }
+    } else {
+        var key = crypto.createHash('sha256').update(key).digest('base64');
+        return {
+            key: key,
+            value: this._cache[key]
+        };
     }
 }
 
 RedisReady.prototype.ensureSpace = function(key, size) {
-    console.log("Ensuring Space for " + key + " total size " + size);
     if (this._spaceRemaining >= size) {
         return this._spaceRemaining - size;
     } else if (this._maxSpace - size < 0) {
@@ -47,7 +68,6 @@ RedisReady.prototype.ensureSpace = function(key, size) {
     }
 
     var needed = size - this._spaceRemaining;
-        console.log('need', size - this._spaceRemaining);
     while (needed >= 0) {
         if (this._spaceRemaining === this._maxSpace) {
             return;
@@ -67,7 +87,6 @@ RedisReady.prototype.ensureSpace = function(key, size) {
 
 RedisReady.prototype.get = function(key) {
     var key = crypto.createHash('sha256').update(key).digest('base64');
-    console.log(key.length);
     if (!this._cache.hasOwnProperty(key)) {
         return;
     }
@@ -110,7 +129,6 @@ RedisReady.prototype.getLastElementKey = function() {
 
 RedisReady.prototype.set = function(key, value) {
     var key = crypto.createHash('sha256').update(key).digest('base64');
-
     var element = {
         blob: msgpack.encode(value),
         next: null,
@@ -127,23 +145,22 @@ RedisReady.prototype.set = function(key, value) {
         // If it's already the most recently accessed, update storage and return
         if (key === this._first) {
             // Since no keys have changed, we can just update to reflect new blob size;
-            this._spaceRemaining -= element.blob.length;
-            this._spaceRemaining += this._cache[key].blob.length;
-            this.ensureSpace(key, element.blob.length);
-            this._cache[key] = element;
+            this._spaceRemaining += this.computeSize(this._cache[key]);
+            this._updateCache(key, element);
             return value;
         }
 
         this._updateLinks(key, element.previous, element.next)
-    } else {
-        this.ensureSpace(key, element.blob.length);
-        this._cache[key] = element;
     }
 
+    // Cache the new key since it does not exist
+    this._updateCache(key, element);
+
+    // Update linked list
     element.next = null;
     element.previous = this._first;
 
-    if (this._first) {
+    if (this._first !== null) {
         this._cache[this._first].next = key;
     }
     this._first = key;
@@ -152,8 +169,14 @@ RedisReady.prototype.set = function(key, value) {
         this._previous = key;
     }
 
-    this._spaceRemaining -= element.blob.length;
     return value;
+}
+
+RedisReady.prototype._updateCache = function(key, element) {
+    var size = this.computeSize(element);
+    this.ensureSpace(key, size);
+    this._spaceRemaining -= size;
+    this._cache[key] = element;
 }
 
 RedisReady.prototype._updateLinks = function(key, previous, next) {
@@ -170,3 +193,5 @@ RedisReady.prototype._updateLinks = function(key, previous, next) {
         this._cache[next].previous = previous;
     }
 }
+
+module.exports = RedisReady;
