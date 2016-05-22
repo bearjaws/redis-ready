@@ -1,0 +1,26 @@
+{
+  "name": "redis-ready",
+  "version": "1.0.0",
+  "description": "A LRU cache module that works without redis or with redis  if needed.",
+  "main": "index.js",
+  "scripts": {
+    "test": "mocha test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bearjaws/redis-ready.git"
+  },
+  "keywords": [
+    "redis",
+    "LRU",
+    "memcache",
+    "no",
+    "setup"
+  ],
+  "author": "bearjaws",
+  "license": "GPL-3.0",
+  "bugs": {
+    "url": "https://github.com/bearjaws/redis-ready/issues"
+  },
+  "homepage": "https://github.com/bearjaws/redis-ready#readme"
+}
