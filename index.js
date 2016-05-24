@@ -86,7 +86,7 @@ RedisReady.prototype.ensureSpace = function(key, size) {
     return this._spaceRemaining;
 }
 
-RedisReady.prototype.get = function(key) {
+RedisReady.prototype.get = function(key, callback) {
     var key = crypto.createHash(this._hashingAlgo).update(key).digest('base64');
     if (!this._cache.hasOwnProperty(key)) {
         return;
@@ -128,7 +128,7 @@ RedisReady.prototype.getLastElementKey = function() {
     return this._last;
 }
 
-RedisReady.prototype.set = function(key, value) {
+RedisReady.prototype.set = function(key, value, callback) {
     var key = crypto.createHash(this._hashingAlgo).update(key).digest('base64');
     var element = {
         blob: msgpack.encode(value),
@@ -169,7 +169,6 @@ RedisReady.prototype.set = function(key, value) {
     if (!this._previous) {
         this._previous = key;
     }
-
     return value;
 }
 
